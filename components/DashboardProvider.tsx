@@ -14,6 +14,7 @@ import { useRouter } from "next/navigation";
 import { getCallLogs, getConversations, getLeads } from "@/lib/api";
 import { hasFeature } from "@/config/shops";
 import type { Shop } from "@/config/types";
+import { parseTs } from "@/lib/format";
 import type { CallLog, Lead, Message } from "@/lib/types";
 
 const SLOW_POLL_MS = 15_000;
@@ -151,6 +152,13 @@ export function DashboardProvider({ shop, children }: { shop: Shop; children: Re
       const list = map.get(m.lead_id);
       if (list) list.push(m);
       else map.set(m.lead_id, [m]);
+    }
+    // Oldest → newest. The server sorts by whole seconds, so messages sent in the same second
+    // (e.g. a quick reply) can come back in either order; the id breaks the tie. Optimistic
+    // messages (negative ids) haven't been saved yet, so they go last.
+    const order = (m: Message) => (m.id < 0 ? Number.MAX_SAFE_INTEGER : m.id);
+    for (const list of map.values()) {
+      list.sort((a, b) => (parseTs(a.created_at)?.getTime() ?? 0) - (parseTs(b.created_at)?.getTime() ?? 0) || order(a) - order(b));
     }
     return map;
   }, [messages]);

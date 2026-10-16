@@ -54,8 +54,9 @@ function needsCall(lead: Lead, msgs: Message[]): boolean {
   return !!first && Date.now() - first.getTime() > 30 * 60 * 1000;
 }
 
-function lastActivity(msgs: Message[]): string {
-  return msgs[msgs.length - 1]?.created_at ?? "";
+/** Time of the newest message, as a number (0 if unparseable) so sorting never depends on string formats. */
+function lastActivity(msgs: Message[]): number {
+  return parseTs(msgs[msgs.length - 1]?.created_at)?.getTime() ?? 0;
 }
 
 export function ConversationList() {
@@ -89,15 +90,10 @@ export function ConversationList() {
 
   const visible = useMemo(() => {
     const list = filter === "all" ? withMessages : withMessages.filter((l) => bucketOf(l, messagesByLead.get(l.id)!) === filter);
-    // Leads that replied first (they're hot), then most recent activity.
-    return [...list].sort((a, b) => {
-      const am = messagesByLead.get(a.id)!;
-      const bm = messagesByLead.get(b.id)!;
-      const ar = hasInbound(am);
-      const br = hasInbound(bm);
-      if (ar !== br) return ar ? -1 : 1;
-      return lastActivity(bm).localeCompare(lastActivity(am));
-    });
+    // Strictly newest activity first, in every tab. (Don't rank "has replied" above recency:
+    // a reply from last week would then outrank a message that arrived a minute ago.)
+    const last = new Map(list.map((l) => [l.id, lastActivity(messagesByLead.get(l.id)!)]));
+    return [...list].sort((a, b) => last.get(b.id)! - last.get(a.id)! || b.id - a.id);
   }, [withMessages, messagesByLead, filter]);
 
   return (
