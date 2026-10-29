@@ -78,8 +78,10 @@ export interface DemoTriggerConfig {
   vehicleField: string;
   vehicleLabel: string;
   vehiclePlaceholder: string;
-  /** If present, shows a service dropdown sent as `lead_special_override`. */
+  /** If present, shows a service dropdown, sent as `lead_special_override` unless `serviceField` says otherwise. */
   services?: string[];
+  /** Payload field the backend's fieldMapping.leadSpecial reads the service from. */
+  serviceField?: string;
   serviceLabel?: string;
 }
 

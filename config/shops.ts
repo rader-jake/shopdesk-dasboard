@@ -190,6 +190,37 @@ export const SHOPS: Record<string, Shop> = defineShops({
       vehiclePlaceholder: "Pool + Spa",
     },
   },
+
+  // ShopDesk itself. The id matches the backend's `shopdesk-demo` shop, which is where every demo
+  // requested on the public landing page lands, so this dashboard shows each visitor's conversation.
+  "shopdesk-demo": {
+    name: "ShopDesk",
+    location: "shopdesk.ai",
+    timezone: "America/Chicago",
+    username: "jake",
+    password: "shopdesk2026",
+    smsPassword: "shopdesk2026",
+    adminSecret: "purevision2026",
+    theme: {
+      accent: "#c8ff00",
+      accentDark: "#4a5a00",
+      surface: "#161615",
+      surface2: "#1f1f1d",
+      bg: "#0c0c0b",
+      displayFont: "DM Serif Display",
+      bodyFont: "DM Sans",
+    },
+    features: ["conversations", "leads", "demoTrigger"],
+    owner: "Jake",
+    demoTrigger: {
+      vehicleField: "business_name",
+      vehicleLabel: "Business",
+      vehiclePlaceholder: "Acme Roofing",
+      serviceLabel: "Industry",
+      serviceField: "industry",
+      services: ["Window Tinting", "Detailing", "PPF", "Epoxy Flooring", "Landscaping", "Roofing", "HVAC", "Dental", "Real Estate", "Other"],
+    },
+  },
 });
 
 /** Neutral ShopDesk look for screens shown before we know which shop is signing in. */
