@@ -5,6 +5,8 @@ One Next.js app that serves every ShopDesk client's dashboard. A shop's entry in
 
 | URL                      | What                                    | Needs feature        |
 | ------------------------ | --------------------------------------- | -------------------- |
+| `/`                      | Public landing page (interactive demo)  | —                    |
+| `/beauty`                | ShopDesk Beauty landing page            | —                    |
 | `/login?shop=<id>`       | Shared sign-in, themed for that shop    | —                    |
 | `/<shopId>`              | Conversations (+ stats, demo trigger)   | `conversations`      |
 | `/<shopId>/calls`        | Call history                            | `callHistory`        |
@@ -47,6 +49,21 @@ npm run dev                # http://localhost:3000
   written in Call Mode also shows on that customer's appointments. Without the flag, Call Mode's note box only goes in the call log.
   The backend's `/admin/notes` routes are currently scoped to Pure Vision Tints, so only enable it for that shop for now.
 - `demoTrigger` adds the demo card to the Conversations page (needs `shop.demoTrigger`).
+
+## Public site (`/` and `/beauty`)
+
+Lives in the `app/(marketing)/` route group, with its code under `components/marketing/` and `lib/marketing/`.
+
+- **Look:** a light theme scoped by the `.marketing` class in `app/globals.css`, so it reuses the same token names the
+  dashboards use. Its fonts load from `lib/marketing/fonts.ts`; the dashboards' fonts are untouched.
+- **The funnel:** industry → 3 questions → phone → confirmation. Pricing, results and the FAQ load only after a demo is sent.
+  Their copy is in `lib/marketing/content.ts`.
+- **Demo submissions:** the browser calls `/api/demo`, which validates, drops honeypot hits, rate-limits (per IP and per
+  phone, best-effort in memory) and forwards to the backend's `POST /webhook/sms-only/shopdesk-demo`. No CORS setup needed.
+  Set `DEMO_API_URL` to point it at a different backend; otherwise it hits production, so local testing sends real texts.
+- **Client Login** goes to the existing `/login`. Signed-in clients are sent straight to their dashboard.
+- **Search:** the root layout marks the app `noindex` (dashboards); the public pages opt back in, and `robots.ts` /
+  `sitemap.ts` list only `/` and `/beauty`.
 
 ## Adding a client
 

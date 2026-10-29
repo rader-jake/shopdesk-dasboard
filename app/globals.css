@@ -45,6 +45,102 @@
   --font-display: var(--display-stack);
   --font-sans: var(--body-stack);
   --font-mono: var(--mono-stack);
+
+  /* Public site cards */
+  --shadow-card: 0 1px 2px rgba(20, 20, 15, 0.04), 0 8px 24px rgba(20, 20, 15, 0.05);
+  --shadow-lift: 0 2px 4px rgba(20, 20, 15, 0.05), 0 14px 36px rgba(20, 20, 15, 0.09);
+  --shadow-glow: 0 6px 24px rgba(184, 240, 0, 0.45);
+}
+
+/*
+ * Public site (/ and /beauty): a light scope that reuses the same token names the dashboards use,
+ * so `bg-bg`, `text-text`, `bg-accent`… work here too. Fonts come from lib/marketing/fonts.ts.
+ */
+.marketing {
+  --bg: #fafaf8;
+  --surface: #ffffff;
+  --surface2: #f4f4ef;
+  --accent: #c8ff00;
+  --accent-dark: #4a5a00;
+  --on-accent: #14140f;
+  --text: #14140f;
+  --muted: #66665e;
+  --line: #e7e7df;
+  --line2: #cfcfc6;
+  --display-stack: var(--font-mk-serif), Georgia, serif;
+  --body-stack: var(--font-mk-sans), "Helvetica Neue", Arial, sans-serif;
+}
+
+/* Keep the page background light behind the iOS rubber-band and under short pages. */
+html:has(.marketing),
+body:has(.marketing) {
+  background: #fafaf8;
+}
+
+/* The lime accent is a fill on this site, never an outline on white. */
+.marketing :focus-visible {
+  outline-color: var(--text);
+}
+
+/* Marker-pen highlight behind a word; the lime stays a background so the text keeps full contrast. */
+.marketing .mark {
+  background: linear-gradient(transparent 58%, var(--accent) 58%, var(--accent) 92%, transparent 92%);
+  padding: 0 0.08em;
+  margin: 0 -0.08em;
+  -webkit-box-decoration-break: clone;
+  box-decoration-break: clone;
+}
+
+.marketing .btn-lime {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  gap: 0.5rem;
+  border-radius: 9999px;
+  background: var(--accent);
+  padding: 1rem 1.75rem;
+  font-size: 1rem;
+  font-weight: 600;
+  color: var(--on-accent);
+  box-shadow: var(--shadow-glow);
+  transition: transform 0.2s, filter 0.2s;
+}
+.marketing .btn-lime:hover:not(:disabled) {
+  transform: translateY(-2px);
+  filter: brightness(0.96);
+}
+.marketing .btn-lime:disabled {
+  cursor: not-allowed;
+  background: var(--line);
+  color: var(--muted);
+  box-shadow: none;
+}
+
+.marketing .field {
+  width: 100%;
+  border-radius: 1rem;
+  border: 1px solid var(--line);
+  background: var(--surface);
+  padding: 1rem 1.25rem;
+  font-size: 1.125rem;
+  color: var(--text);
+  outline: none;
+  transition: border-color 0.15s, box-shadow 0.15s;
+}
+.marketing .field::placeholder {
+  color: color-mix(in srgb, var(--muted) 60%, transparent);
+}
+.marketing .field:focus {
+  border-color: var(--text);
+  box-shadow: 0 0 0 4px color-mix(in srgb, var(--accent) 60%, transparent);
+}
+
+/* FAQ disclosure marker */
+.marketing details > summary {
+  list-style: none;
+}
+.marketing details > summary::-webkit-details-marker {
+  display: none;
 }
 
 html,
