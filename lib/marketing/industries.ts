@@ -1,22 +1,22 @@
 export interface Industry {
   id: string;
-  emoji: string;
   label: string;
 }
 
 export const INDUSTRIES: Industry[] = [
-  { id: "tinting", emoji: "🔧", label: "Window Tinting" },
-  { id: "detailing", emoji: "✨", label: "Auto Detailing" },
-  { id: "ppf", emoji: "🛡️", label: "PPF & Wraps" },
-  { id: "epoxy", emoji: "🏠", label: "Epoxy Flooring" },
-  { id: "landscaping", emoji: "🌿", label: "Landscaping" },
-  { id: "power-washing", emoji: "💧", label: "Power Washing" },
-  { id: "home-services", emoji: "🔨", label: "Home Services" },
-  { id: "dental", emoji: "🦷", label: "Dental" },
-  { id: "med-spa", emoji: "💆", label: "Med Spa / Beauty" },
-  { id: "insurance", emoji: "📋", label: "Insurance" },
-  { id: "roofing", emoji: "🏗️", label: "Roofing" },
-  { id: "hvac", emoji: "⚡", label: "HVAC" },
+  { id: "tinting", label: "Window Tinting" },
+  { id: "detailing", label: "Auto Detailing" },
+  { id: "ppf", label: "PPF & Wraps" },
+  { id: "epoxy", label: "Epoxy Flooring" },
+  { id: "landscaping", label: "Landscaping" },
+  { id: "power-washing", label: "Power Washing" },
+  { id: "home-services", label: "Home Services" },
+  { id: "dental", label: "Dental" },
+  { id: "med-spa", label: "Med Spa / Beauty" },
+  { id: "insurance", label: "Insurance" },
+  { id: "real-estate", label: "Real Estate" },
+  { id: "roofing", label: "Roofing" },
+  { id: "hvac", label: "HVAC" },
 ];
 
 export const LEAD_VOLUMES = ["Under 20", "20-50", "50-100", "100+"];

@@ -1,10 +1,14 @@
+import Image from "next/image";
 import Link from "next/link";
 
+/** The robot logo sits on a dark tile: its antenna and eyes are white, so it needs a dark backdrop. */
 export function Wordmark({ className = "" }: { className?: string }) {
   return (
-    <span className={`font-display text-xl tracking-tight text-text ${className}`}>
+    <span className={`inline-flex items-center gap-2 font-display text-xl tracking-tight text-text ${className}`}>
+      <span className="grid size-[1.7em] place-items-center rounded-[0.5em] bg-[#14140f]">
+        <Image src="/brand/logo.png" alt="" width={512} height={398} className="h-auto w-[1.05em]" priority />
+      </span>
       ShopDesk
-      <span className="ml-0.5 inline-block size-2 rounded-full bg-accent align-baseline ring-1 ring-text/10" aria-hidden />
     </span>
   );
 }

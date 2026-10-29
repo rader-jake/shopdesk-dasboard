@@ -2,6 +2,7 @@
 
 import dynamic from "next/dynamic";
 import { useCallback, useEffect, useRef, useState, type FormEvent } from "react";
+import Image from "next/image";
 import { AnimatePresence, m } from "framer-motion";
 import { CHALLENGES, INDUSTRIES, LEAD_VOLUMES, possessive, type Industry } from "@/lib/marketing/industries";
 import { formatPhone, nextPhoneValue, toE164 } from "@/lib/marketing/phone";
@@ -134,10 +135,6 @@ export default function DemoFunnel() {
           aria-hidden
         />
         <div className="mx-auto max-w-3xl text-center">
-          <p className="mb-5 inline-flex items-center gap-2 rounded-full border border-line bg-surface px-3.5 py-1.5 text-xs font-medium text-muted">
-            <span className="h-1.5 w-1.5 rounded-full bg-accent ring-1 ring-text/20" aria-hidden />
-            Live demo · no signup · no credit card
-          </p>
           <h1
             id="hero-title"
             className="font-display text-[2.6rem] leading-[1.05] tracking-tight text-text sm:text-6xl"
@@ -162,20 +159,18 @@ export default function DemoFunnel() {
                 transition={{ duration: 0.22, ease: "easeOut" }}
               >
                 <p className="mb-4 text-center text-sm font-medium text-muted">What kind of business do you run?</p>
-                <ul className="grid grid-cols-2 gap-3 sm:grid-cols-3 sm:gap-4">
+                <ul className="flex flex-wrap justify-center gap-3 sm:gap-4">
                   {INDUSTRIES.map((item) => (
-                    <li key={item.id}>
+                    <li key={item.id} className="basis-[calc(50%-0.375rem)] sm:basis-[calc(33.333%-0.667rem)]">
                       <m.button
                         type="button"
                         onClick={() => pickIndustry(item)}
                         whileHover={{ scale: 1.03 }}
                         whileTap={{ scale: 0.97 }}
                         transition={{ type: "spring", stiffness: 400, damping: 24 }}
-                        className="group flex h-full min-h-[104px] w-full flex-col items-center justify-center gap-2 rounded-2xl border border-line bg-surface px-3 py-5 text-center shadow-card transition-colors hover:border-text hover:bg-accent/15 sm:min-h-[120px]"
+                        className="group flex h-full min-h-[136px] w-full flex-col items-center justify-center gap-1 rounded-2xl border border-line bg-surface px-3 pb-4 pt-3 text-center shadow-card transition-colors hover:border-text hover:bg-accent/15 sm:min-h-[156px]"
                       >
-                        <span className="text-3xl" aria-hidden>
-                          {item.emoji}
-                        </span>
+                        <IndustryIcon id={item.id} className="size-[76px] sm:size-24" />
                         <span className="text-[15px] font-semibold leading-tight text-text">{item.label}</span>
                       </m.button>
                     </li>
@@ -203,8 +198,9 @@ export default function DemoFunnel() {
                   >
                     ← Back
                   </button>
-                  <span className="rounded-full bg-bg px-3 py-1 text-xs font-medium text-muted">
-                    {industry.emoji} {industry.label}
+                  <span className="inline-flex items-center gap-1 rounded-full bg-bg py-0.5 pl-1 pr-3 text-xs font-medium text-muted">
+                    <IndustryIcon id={industry.id} className="-ml-1 size-6" />
+                    {industry.label}
                   </span>
                 </div>
 
@@ -228,7 +224,7 @@ export default function DemoFunnel() {
                       className="field mt-6"
                       value={business}
                       onChange={(e) => setBusiness(e.target.value)}
-                      placeholder="e.g. Lone Star Tint"
+                      placeholder="Your business name"
                       maxLength={60}
                       autoComplete="organization"
                       enterKeyHint="next"
@@ -358,6 +354,10 @@ export default function DemoFunnel() {
       {unlocked && <ProofAndPricing onRestart={restart} />}
     </>
   );
+}
+
+function IndustryIcon({ id, className }: { id: string; className?: string }) {
+  return <Image src={`/industries/${id}.svg`} alt="" width={156} height={156} sizes="96px" className={className} />;
 }
 
 function Options({
