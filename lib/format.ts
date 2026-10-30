@@ -121,7 +121,7 @@ export function hourLabel(h: number): string {
   return `${h12} ${suffix}`;
 }
 
-/** [SEND_PHOTO: key] → readable placeholder for one-line previews. */
+/** [SEND_PHOTO: key] / [MEDIA: id] → readable placeholder for one-line previews. */
 export function previewText(body: string): string {
-  return body.replace(/\[SEND_PHOTO: \w+\]/g, "[photo]").replace(/\s+/g, " ").trim() || "—";
+  return body.replace(/\[(?:SEND_PHOTO|MEDIA): \w+\]/g, "[photo]").replace(/\s+/g, " ").trim() || "—";
 }

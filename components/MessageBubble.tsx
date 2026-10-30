@@ -1,6 +1,7 @@
 "use client";
 
 import { useDashboard } from "@/components/DashboardProvider";
+import { API } from "@/lib/api";
 import { cn } from "@/lib/cn";
 import { fmtDate, initials } from "@/lib/format";
 import type { Message } from "@/lib/types";
@@ -8,18 +9,19 @@ import type { Message } from "@/lib/types";
 type Part = { kind: "text"; text: string } | { kind: "media"; key: string; url: string; video: boolean };
 
 /**
- * Splits a message into text and `[SEND_PHOTO: key]` media. Unknown keys are dropped.
+ * Splits a message into text and media: `[SEND_PHOTO: key]` (the AI's hosted photos, looked up in the
+ * shop config) and `[MEDIA: id]` (a photo sent from the dashboard, served by the backend). Unknown keys are dropped.
  * Everything is returned as data and rendered as React nodes, so message text is
  * always escaped — nothing a customer types can inject markup.
  */
 export function parseMessageBody(body: string, photos: Record<string, string>): Part[] {
   const parts: Part[] = [];
-  const re = /\[SEND_PHOTO: (\w+)\]/g;
+  const re = /\[(SEND_PHOTO|MEDIA): (\w+)\]/g;
   let last = 0;
   for (let m = re.exec(body); m; m = re.exec(body)) {
     if (m.index > last) parts.push({ kind: "text", text: body.slice(last, m.index) });
-    const url = Object.hasOwn(photos, m[1]) ? photos[m[1]] : undefined;
-    if (url) parts.push({ kind: "media", key: m[1], url, video: /\.(mp4|mov)$/i.test(url) });
+    const url = m[1] === "MEDIA" ? `${API}/media/${m[2]}` : Object.hasOwn(photos, m[2]) ? photos[m[2]] : undefined;
+    if (url) parts.push({ kind: "media", key: m[2], url, video: /\.(mp4|mov)$/i.test(url) });
     last = m.index + m[0].length;
   }
   if (last < body.length) parts.push({ kind: "text", text: body.slice(last) });

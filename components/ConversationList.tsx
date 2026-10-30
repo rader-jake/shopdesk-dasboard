@@ -1,7 +1,7 @@
 "use client";
 
 import { useEffect, useMemo, useRef, useState } from "react";
-import { Flame, MessageSquare, Phone, Send, X } from "lucide-react";
+import { Flame, ImagePlus, MessageSquare, Phone, Send, X } from "lucide-react";
 import { useDashboard } from "@/components/DashboardProvider";
 import { MessageBubble } from "@/components/MessageBubble";
 import { Button } from "@/components/ui/button";
@@ -10,7 +10,7 @@ import { ConfirmDialog } from "@/components/ui/confirm";
 import { EmptyState, Notice, Spinner } from "@/components/ui/states";
 import { useToast } from "@/components/ui/toast";
 import { hasFeature } from "@/config/shops";
-import { ApiError, sendMessage, toggleManualMode, updateLeadStatus } from "@/lib/api";
+import { ApiError, sendMessage, sendPhoto, toggleManualMode, updateLeadStatus } from "@/lib/api";
 import { cn } from "@/lib/cn";
 import {
   BOOKED_STATUSES,
@@ -22,6 +22,7 @@ import {
   previewText,
   vehicleOf,
 } from "@/lib/format";
+import { photoToBase64 } from "@/lib/image";
 import type { Lead, Message } from "@/lib/types";
 
 type Bucket = "replied" | "noReply" | "booked" | "mia" | "dead";
@@ -246,6 +247,8 @@ function Thread({ lead, msgs }: { lead: Lead; msgs: Message[] }) {
 
   const [draft, setDraft] = useState("");
   const [sending, setSending] = useState(false);
+  const [photo, setPhoto] = useState<{ file: File; previewUrl: string } | null>(null);
+  const photoInputRef = useRef<HTMLInputElement>(null);
   const [confirmKill, setConfirmKill] = useState(false);
   const [killing, setKilling] = useState(false);
 
@@ -274,18 +277,32 @@ function Thread({ lead, msgs }: { lead: Lead; msgs: Message[] }) {
     }
   };
 
+  const clearPhoto = () => {
+    setPhoto((p) => {
+      if (p) URL.revokeObjectURL(p.previewUrl);
+      return null;
+    });
+    if (photoInputRef.current) photoInputRef.current.value = "";
+  };
+
   const send = async () => {
     const message = draft.trim();
-    if (!message || sending) return;
+    if ((!message && !photo) || sending) return;
     setSending(true);
     try {
-      await sendMessage(shop.adminSecret, lead.id, message);
+      if (photo) {
+        const mediaId = await sendPhoto(shop.adminSecret, lead.id, await photoToBase64(photo.file), message);
+        clearPhoto();
+        addMessage({ lead_id: lead.id, direction: "outbound", body: `${message ? message + "\n" : ""}[MEDIA: ${mediaId}]` });
+      } else {
+        await sendMessage(shop.adminSecret, lead.id, message);
+        addMessage({ lead_id: lead.id, direction: "outbound", body: message });
+      }
       setDraft("");
-      addMessage({ lead_id: lead.id, direction: "outbound", body: message });
       stickToBottom.current = true;
       setTimeout(() => void refresh(), 1200); // pick up the server's copy
     } catch (e) {
-      toast(e instanceof ApiError ? e.message : "Message failed to send", "error");
+      toast(e instanceof ApiError || e instanceof Error ? e.message : "Message failed to send", "error");
     } finally {
       setSending(false);
     }
@@ -348,30 +365,67 @@ function Thread({ lead, msgs }: { lead: Lead; msgs: Message[] }) {
       </div>
 
       {manual && (
-        <div className="flex items-end gap-2 border-t border-line bg-manual/5 px-4 py-3 md:px-5">
-          <textarea
-            value={draft}
-            onChange={(e) => setDraft(e.target.value)}
-            onKeyDown={(e) => {
-              if (e.key === "Enter" && !e.shiftKey) {
-                e.preventDefault();
-                void send();
-              }
-            }}
-            rows={1}
-            placeholder={shop.owner ? `Type a message as ${shop.owner}…` : "Type a message…"}
-            aria-label="Message"
-            className="max-h-24 min-h-11 flex-1 resize-none rounded-xl border border-manual/25 bg-text/5 px-3.5 py-2.5 text-base leading-snug outline-none placeholder:text-muted/70 focus:border-manual/50 [field-sizing:content]"
-          />
-          <button
-            type="button"
-            onClick={() => void send()}
-            disabled={sending || !draft.trim()}
-            aria-label="Send message"
-            className="flex size-11 shrink-0 items-center justify-center rounded-xl bg-manual text-black transition hover:brightness-110 disabled:opacity-50"
-          >
-            <Send className="size-[18px]" />
-          </button>
+        <div className="border-t border-line bg-manual/5 px-4 py-3 md:px-5">
+          {photo && (
+            <div className="mb-2.5 flex items-center gap-3">
+              {/* eslint-disable-next-line @next/next/no-img-element -- local object URL preview */}
+              <img src={photo.previewUrl} alt="Photo to send" className="size-16 rounded-lg border border-line object-cover" />
+              <button
+                type="button"
+                onClick={clearPhoto}
+                aria-label="Remove photo"
+                className="flex size-8 items-center justify-center rounded-full border border-line text-muted transition hover:text-text"
+              >
+                <X className="size-4" />
+              </button>
+            </div>
+          )}
+          <div className="flex items-end gap-2">
+            <input
+              ref={photoInputRef}
+              type="file"
+              accept="image/*"
+              hidden
+              onChange={(e) => {
+                const file = e.target.files?.[0];
+                if (!file) return;
+                clearPhoto();
+                setPhoto({ file, previewUrl: URL.createObjectURL(file) });
+              }}
+            />
+            <button
+              type="button"
+              onClick={() => photoInputRef.current?.click()}
+              disabled={sending}
+              aria-label="Attach a photo"
+              className="flex size-11 shrink-0 items-center justify-center rounded-xl border border-manual/25 bg-text/5 text-manual transition hover:bg-manual/10 disabled:opacity-50"
+            >
+              <ImagePlus className="size-[18px]" />
+            </button>
+            <textarea
+              value={draft}
+              onChange={(e) => setDraft(e.target.value)}
+              onKeyDown={(e) => {
+                if (e.key === "Enter" && !e.shiftKey) {
+                  e.preventDefault();
+                  void send();
+                }
+              }}
+              rows={1}
+              placeholder={photo ? "Add a caption (optional)…" : shop.owner ? `Type a message as ${shop.owner}…` : "Type a message…"}
+              aria-label="Message"
+              className="max-h-24 min-h-11 flex-1 resize-none rounded-xl border border-manual/25 bg-text/5 px-3.5 py-2.5 text-base leading-snug outline-none placeholder:text-muted/70 focus:border-manual/50 [field-sizing:content]"
+            />
+            <button
+              type="button"
+              onClick={() => void send()}
+              disabled={sending || (!draft.trim() && !photo)}
+              aria-label={photo ? "Send photo" : "Send message"}
+              className="flex size-11 shrink-0 items-center justify-center rounded-xl bg-manual text-black transition hover:brightness-110 disabled:opacity-50"
+            >
+              <Send className="size-[18px]" />
+            </button>
+          </div>
         </div>
       )}
 

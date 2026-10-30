@@ -88,6 +88,16 @@ export function sendMessage(secret: string, leadId: number, message: string): Pr
   return post<{ success: boolean }>("/admin/send-message", { secret, lead_id: leadId, message }).then(() => undefined);
 }
 
+/** Sends a photo (base64 JPEG/PNG/GIF, no data: prefix) as an MMS, with an optional caption. Resolves to the stored photo's id. */
+export function sendPhoto(secret: string, leadId: number, image: string, caption: string): Promise<string> {
+  return post<{ success: boolean; media_id: string }>("/admin/send-photo", {
+    secret,
+    lead_id: leadId,
+    image,
+    caption,
+  }).then((r) => r.media_id);
+}
+
 /** Sends `message` with `attachmentUrl` attached so the link is tappable. */
 export function sendMessageWithLink(secret: string, leadId: number, message: string, attachmentUrl: string): Promise<void> {
   return post<{ success: boolean }>("/admin/send-message-with-link", {
