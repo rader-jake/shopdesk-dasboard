@@ -82,6 +82,8 @@ export interface DemoTriggerConfig {
   services?: string[];
   /** Payload field the backend's fieldMapping.leadSpecial reads the service from. */
   serviceField?: string;
+  /** Sends the admin secret so the backend treats this as staff testing their own number (shopdesk-demo requires an opt-in otherwise). */
+  sendAdminSecret?: boolean;
   serviceLabel?: string;
 }
 

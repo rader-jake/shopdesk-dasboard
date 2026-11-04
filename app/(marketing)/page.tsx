@@ -35,6 +35,12 @@ export default function Home() {
             <Link href="/login" className="rounded hover:text-text">
               Client Login
             </Link>
+            <Link href="/terms" className="rounded hover:text-text">
+              Terms
+            </Link>
+            <Link href="/privacy" className="rounded hover:text-text">
+              Privacy
+            </Link>
             <a href={`mailto:${CONTACT_EMAIL}`} className="rounded hover:text-text">
               {CONTACT_EMAIL}
             </a>

@@ -56,6 +56,7 @@ export function DemoTrigger() {
     setBusy(true);
     try {
       const payload: Record<string, string> = { first_name: first, phone: number, [config.vehicleField]: vehicle.trim() };
+      if (config.sendAdminSecret) payload.secret = shop.adminSecret;
       if (config.services) payload[config.serviceField ?? "lead_special_override"] = service;
       const res = await triggerDemo(shop.id, payload);
 

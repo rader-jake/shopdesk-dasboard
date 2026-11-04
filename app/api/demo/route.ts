@@ -1,5 +1,6 @@
 import { NextResponse } from "next/server";
 import { clientIp, rateLimited } from "@/lib/marketing/rate-limit";
+import { CONSENT_VERSION, DEMO_CONSENT_TEXT, MARKETING_CONSENT_TEXT } from "@/lib/marketing/consent";
 
 // The backend lead webhook. Called from here (not the browser) so it works from any origin —
 // production, Vercel previews, localhost — without touching the backend's CORS allowlist.
@@ -36,6 +37,12 @@ export async function POST(req: Request) {
     return NextResponse.json({ ok: false, error: "Enter a valid US mobile number." }, { status: 400 });
   }
 
+  // Texting a number needs its owner's opt-in. Box 1 is required; box 2 (marketing) is optional.
+  if (body.consent_demo !== true) {
+    return NextResponse.json({ ok: false, error: "Please agree to receive the demo texts to continue." }, { status: 400 });
+  }
+  const consent_marketing = body.consent_marketing === true;
+
   // Each submission texts a real phone: cap per visitor and per number.
   if (rateLimited(`ip:${clientIp(req)}`, 6, 10 * 60_000) || rateLimited(`phone:${phone}`, 2, 10 * 60_000)) {
     return NextResponse.json(
@@ -48,7 +55,20 @@ export async function POST(req: Request) {
     const res = await fetch(DEMO_API_URL, {
       method: "POST",
       headers: { "Content-Type": "application/json" },
-      body: JSON.stringify({ first_name, phone, business_name, industry }),
+      body: JSON.stringify({
+        first_name,
+        phone,
+        business_name,
+        industry,
+        // Proof of opt-in, stored with the lead. The wording and version come from our code, not the browser.
+        consent_demo: true,
+        consent_marketing,
+        consent_version: CONSENT_VERSION,
+        consent_text: consent_marketing ? `${DEMO_CONSENT_TEXT}\n${MARKETING_CONSENT_TEXT}` : DEMO_CONSENT_TEXT,
+        consent_ip: clientIp(req),
+        consent_user_agent: clean(req.headers.get("user-agent"), 300),
+        consent_url: clean(req.headers.get("referer"), 300),
+      }),
       signal: AbortSignal.timeout(12_000),
       cache: "no-store",
     });

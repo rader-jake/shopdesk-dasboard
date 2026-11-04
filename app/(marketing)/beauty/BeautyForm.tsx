@@ -3,6 +3,7 @@
 import { useState, type FormEvent } from "react";
 import { nextPhoneValue, toE164 } from "@/lib/marketing/phone";
 import { requestDemo } from "@/lib/marketing/demo-client";
+import ConsentCheckboxes from "@/components/marketing/ConsentCheckboxes";
 import s from "./beauty.module.css";
 
 const SERVICES = [
@@ -41,13 +42,15 @@ export default function BeautyForm() {
   const [services, setServices] = useState("");
   const [current, setCurrent] = useState("");
   const [honeypot, setHoneypot] = useState("");
+  const [consentDemo, setConsentDemo] = useState(false);
+  const [consentMarketing, setConsentMarketing] = useState(false);
   const [error, setError] = useState("");
   const [sending, setSending] = useState(false);
   const [done, setDone] = useState(false);
 
   async function submit(e: FormEvent) {
     e.preventDefault();
-    if (sending) return;
+    if (sending || !consentDemo) return;
     if (!name.trim() || !business.trim() || !phone.trim() || !email.trim()) {
       setError("Please fill in all required fields");
       return;
@@ -65,6 +68,8 @@ export default function BeautyForm() {
       phone: e164,
       business_name: business.trim(),
       industry: `Beauty | ${services} | Currently using: ${current} | Email: ${email.trim()}`,
+      consent_demo: consentDemo,
+      consent_marketing: consentMarketing,
       company_website: honeypot,
     });
     setSending(false);
@@ -173,13 +178,11 @@ export default function BeautyForm() {
               aria-hidden
               style={{ position: "absolute", left: -9999, width: 0, height: 0, opacity: 0 }}
             />
-            <button className={s["form-btn"]} type="submit" disabled={sending}>
+            <ConsentCheckboxes demo={consentDemo} marketing={consentMarketing} onDemo={setConsentDemo} onMarketing={setConsentMarketing} />
+            <button className={s["form-btn"]} type="submit" disabled={sending || !consentDemo}>
               {sending ? "Submitting..." : "Get My Booking Page →"}
             </button>
-            <div className={s["form-note"]}>
-              We&rsquo;ll reach out within a few hours to get your branding and have you live today. By submitting you agree to
-              receive texts from ShopDesk at this number. Msg &amp; data rates may apply. Reply STOP to opt out.
-            </div>
+            <div className={s["form-note"]}>We&rsquo;ll reach out within a few hours to get your branding and have you live today.</div>
             <div role="alert" style={{ fontSize: 12, color: "#d44", textAlign: "center", marginTop: 10, minHeight: 18 }}>
               {error}
             </div>

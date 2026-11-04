@@ -7,6 +7,7 @@ import { AnimatePresence, m } from "framer-motion";
 import { CHALLENGES, INDUSTRIES, LEAD_VOLUMES, possessive, type Industry } from "@/lib/marketing/industries";
 import { formatPhone, nextPhoneValue, toE164 } from "@/lib/marketing/phone";
 import { requestDemo } from "@/lib/marketing/demo-client";
+import ConsentCheckboxes from "./ConsentCheckboxes";
 
 // Pricing, results and FAQ only load once a demo has actually been sent.
 const ProofAndPricing = dynamic(() => import("./ProofAndPricing"), { ssr: false });
@@ -36,6 +37,8 @@ export default function DemoFunnel() {
   const [volume, setVolume] = useState<string | null>(null);
   const [challenge, setChallenge] = useState<string | null>(null);
   const [phone, setPhone] = useState("");
+  const [consentDemo, setConsentDemo] = useState(false);
+  const [consentMarketing, setConsentMarketing] = useState(false);
   const [sending, setSending] = useState(false);
   const [error, setError] = useState("");
   const [alreadySent, setAlreadySent] = useState(false);
@@ -88,7 +91,7 @@ export default function DemoFunnel() {
 
   const submitPhone = async (e: FormEvent) => {
     e.preventDefault();
-    if (sending || !industry) return;
+    if (sending || !industry || !consentDemo) return;
     const e164 = toE164(phone);
     if (!e164) {
       setError("Enter a valid 10-digit US mobile number.");
@@ -102,6 +105,8 @@ export default function DemoFunnel() {
       phone: e164,
       business_name: name,
       industry: `${industry.label} | ${volume} leads/mo | Challenge: ${challenge}`,
+      consent_demo: consentDemo,
+      consent_marketing: consentMarketing,
       company_website: honeypot,
     });
     setSending(false);
@@ -120,6 +125,8 @@ export default function DemoFunnel() {
     setVolume(null);
     setChallenge(null);
     setPhone("");
+    setConsentDemo(false);
+    setConsentMarketing(false);
     setError("");
     setAlreadySent(false);
     go("industry", -1);
@@ -288,14 +295,16 @@ export default function DemoFunnel() {
                     <p id="phone-help" role="alert" className="mt-3 min-h-[1.25rem] text-center text-sm text-red-700">
                       {error}
                     </p>
-                    <button type="submit" className="btn-lime mt-2 w-full text-lg" disabled={sending}>
+                    <ConsentCheckboxes
+                      demo={consentDemo}
+                      marketing={consentMarketing}
+                      onDemo={setConsentDemo}
+                      onMarketing={setConsentMarketing}
+                    />
+                    <button type="submit" className="btn-lime mt-5 w-full text-lg" disabled={sending || !consentDemo}>
                       {sending ? "Sending…" : "Send me a demo →"}
                     </button>
                     <p className="mt-4 text-center text-sm font-medium text-text">No signup. No credit card. Just a text.</p>
-                    <p className="mt-3 text-center text-xs leading-relaxed text-muted">
-                      By tapping send you agree to receive a text conversation from ShopDesk at this number. Msg &amp; data
-                      rates may apply. Reply STOP to opt out.
-                    </p>
                   </form>
                 )}
               </m.div>

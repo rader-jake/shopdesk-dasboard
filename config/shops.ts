@@ -218,6 +218,7 @@ export const SHOPS: Record<string, Shop> = defineShops({
       vehiclePlaceholder: "Acme Roofing",
       serviceLabel: "Industry",
       serviceField: "industry",
+      sendAdminSecret: true,
       services: ["Window Tinting", "Detailing", "PPF", "Epoxy Flooring", "Landscaping", "Roofing", "HVAC", "Dental", "Real Estate", "Other"],
     },
   },
