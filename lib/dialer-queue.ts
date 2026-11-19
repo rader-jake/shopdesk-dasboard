@@ -9,13 +9,18 @@ import type { CallLog, Lead, Message } from "@/lib/types";
  *   2. replied, then went quiet      (or marked MIA), most recent reply first
  *   3. never replied, newest first
  * Held back (shown, but unchecked): texting us right now, called in the last day, tried several times
- * with no answer, or already talked to. Dead / opted-out / booked leads never appear.
+ * with no answer, already talked to, or gone stale (nothing said either way for longer than the chosen
+ * window). Dead / opted-out / booked leads never appear.
  */
-export type QueueGroup = "ready" | "texting" | "recent" | "tried" | "talked";
+export type QueueGroup = "ready" | "texting" | "recent" | "tried" | "talked" | "stale";
+
+export type ContactKind = "they texted" | "we texted" | "they called" | "we called" | "we spoke" | "came in";
 
 export interface Candidate {
   lead: Lead;
   group: QueueGroup;
+  /** The most recent time either side communicated (text, call, or the lead coming in), and how. */
+  lastContact: { at: number; kind: ContactKind };
   /** Why it landed here, e.g. "Replied · quiet 3d". */
   reason: string;
   /** True for the leads most worth a call (callbacks, missed inbound calls, replied-then-quiet). */
@@ -23,6 +28,7 @@ export interface Candidate {
 }
 
 const HOUR = 3_600_000;
+const DAY = 24 * HOUR;
 const COOLDOWN_HOURS = 24;
 const TEXTING_NOW_HOURS = 2;
 export const MAX_NO_ANSWERS = 3;
@@ -42,10 +48,19 @@ function isAttempt(log: CallLog): boolean {
   return !notes.startsWith("Inbound") && !notes.startsWith("Voicemail");
 }
 
+function contactKindOf(log: CallLog): ContactKind {
+  const notes = log.notes ?? "";
+  if (notes.startsWith("Inbound") || notes.startsWith("Voicemail") || log.outcome === "missed_call") return "they called";
+  if (["connected", "callback", "booked", "not_interested"].includes(log.outcome)) return "we spoke";
+  return "we called";
+}
+
+/** `maxAgeDays`: ready leads with no contact in that long are moved to "stale". null = no limit. */
 export function buildQueue(
   leads: Lead[],
   messagesByLead: Map<number, Message[]>,
   callLogs: CallLog[],
+  maxAgeDays: number | null = null,
   now: number = Date.now(),
 ): Record<QueueGroup, Candidate[]> {
   const logsByLead = new Map<number, CallLog[]>();
@@ -57,7 +72,7 @@ export function buildQueue(
   }
   const time = (ts: string | null | undefined) => parseTs(ts)?.getTime() ?? 0;
 
-  const out: Record<QueueGroup, Candidate[]> = { ready: [], texting: [], recent: [], tried: [], talked: [] };
+  const out: Record<QueueGroup, Candidate[]> = { ready: [], texting: [], recent: [], tried: [], talked: [], stale: [] };
   const sortKey = new Map<number, [number, number]>(); // ready leads: [tier, recency]
 
   for (const lead of leads) {
@@ -79,7 +94,18 @@ export function buildQueue(
     const lastAttempt = attempts.reduce((t, l) => Math.max(t, time(l.created_at)), 0);
     const noAnswers = attempts.filter((l) => l.outcome === "no_answer" || l.outcome === "voicemail").length;
 
-    const add = (group: QueueGroup, reason: string, ripe = false) => out[group].push({ lead, group, reason, ripe });
+    let lastContact: Candidate["lastContact"] = { at: time(lead.created_at), kind: "came in" };
+    const consider = (at: number, kind: ContactKind) => {
+      if (at > lastContact.at) lastContact = { at, kind };
+    };
+    for (const m of msgs) consider(time(m.created_at), m.direction === "inbound" ? "they texted" : "we texted");
+    for (const l of logs) consider(time(l.created_at), contactKindOf(l));
+
+    const add = (group: QueueGroup, reason: string, ripe = false) => {
+      const stale = group === "ready" && maxAgeDays !== null && now - lastContact.at > maxAgeDays * DAY;
+      const final = stale ? "stale" : group;
+      out[final].push({ lead, group: final, reason, ripe, lastContact });
+    };
 
     const calledUs = lastMissed > lastAttempt && lastMissed > lastTalked;
 
@@ -113,5 +139,6 @@ export function buildQueue(
     return ta - tb || rb - ra;
   });
   for (const group of ["texting", "recent", "tried", "talked"] as const) out[group].sort((a, b) => b.lead.id - a.lead.id);
+  out.stale.sort((a, b) => b.lastContact.at - a.lastContact.at);
   return out;
 }
