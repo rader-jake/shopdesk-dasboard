@@ -34,7 +34,7 @@ import { cn } from "@/lib/cn";
 import { firstName, fmtPhone, initials, pad2, slotLabelToHour, todayIn, vehicleOf } from "@/lib/format";
 import type { Lead } from "@/lib/types";
 
-const QUICK_ICONS: Record<QuickText["icon"], LucideIcon> = {
+export const QUICK_ICONS: Record<QuickText["icon"], LucideIcon> = {
   link: Link2,
   star: Star,
   camera: Camera,

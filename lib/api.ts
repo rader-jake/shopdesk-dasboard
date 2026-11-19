@@ -188,8 +188,13 @@ export function startCall(secret: string, leadId: number): Promise<void> {
   return post<{ success: boolean }>("/admin/voice/call", { secret, lead_id: leadId }).then(() => undefined);
 }
 
-export function startDialer(secret: string, shopId: string, leadIds: number[]): Promise<DialerSession> {
-  return post<{ session: DialerSession }>("/admin/voice/dialer/start", { secret, shop_id: shopId, lead_ids: leadIds }).then((r) => r.session);
+/** `skipped` counts leads left out because they were called within the last couple of hours. */
+export function startDialer(secret: string, shopId: string, leadIds: number[]): Promise<{ session: DialerSession; skipped: number }> {
+  return post<{ session: DialerSession; skipped_recent?: number }>("/admin/voice/dialer/start", {
+    secret,
+    shop_id: shopId,
+    lead_ids: leadIds,
+  }).then((r) => ({ session: r.session, skipped: r.skipped_recent ?? 0 }));
 }
 
 /** The shop's running dialer session, if any (so a page reload picks it back up). */

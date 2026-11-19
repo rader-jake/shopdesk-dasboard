@@ -26,6 +26,12 @@ export const pureVisionCallMode: CallModeConfig = {
 
   quickTexts: () => [
     {
+      id: "pricing",
+      label: "Send pricing",
+      icon: "tag",
+      text: "Here's the recap: the Ceramic Special covers all side windows and the rear window for a flat $299. Removal of any existing tint is free, and a $20 deposit locks in your spot — it goes toward your final price.",
+    },
+    {
       id: "booking",
       label: "Send booking link",
       icon: "link",

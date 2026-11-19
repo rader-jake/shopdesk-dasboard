@@ -1,19 +1,32 @@
 "use client";
 
 import { useCallback, useEffect, useMemo, useState } from "react";
-import { CircleStop, Pause, Phone, Play, SkipForward, Voicemail } from "lucide-react";
+import { CircleStop, Pause, Phone, Play, SkipForward, ThumbsDown, Voicemail } from "lucide-react";
+import { QUICK_ICONS } from "@/components/CallMode";
 import { useDashboard } from "@/components/DashboardProvider";
 import { Button } from "@/components/ui/button";
 import { Spinner } from "@/components/ui/states";
 import { useToast } from "@/components/ui/toast";
 import { hasFeature } from "@/config/shops";
-import { ApiError, dialerAction, getActiveDialer, getDialer, startDialer, type DialerAction } from "@/lib/api";
+import type { QuickText } from "@/config/types";
+import {
+  ApiError,
+  dialerAction,
+  getActiveDialer,
+  getDialer,
+  logCall,
+  sendMessage,
+  sendMessageWithLink,
+  startDialer,
+  updateLeadStatus,
+  type DialerAction,
+} from "@/lib/api";
 import { cn } from "@/lib/cn";
-import { DEAD_STATUSES, BOOKED_STATUSES, fmtPhone, normPhone, vehicleOf } from "@/lib/format";
-import type { DialerSession } from "@/lib/types";
+import { buildQueue, MAX_NO_ANSWERS, type Candidate, type QueueGroup } from "@/lib/dialer-queue";
+import { firstName, fmtPhone, vehicleOf } from "@/lib/format";
+import type { DialerSession, Lead } from "@/lib/types";
 
 const POLL_MS = 1500;
-const NOT_CALLABLE = [...DEAD_STATUSES, ...BOOKED_STATUSES, "claimed"];
 
 const OUTCOME_LABEL: Record<string, string> = {
   connected: "Talked",
@@ -23,28 +36,29 @@ const OUTCOME_LABEL: Record<string, string> = {
   failed: "Failed",
 };
 
+/** Groups held back from the default queue, with why. They can still be ticked on purpose. */
+const HELD_BACK: { key: Exclude<QueueGroup, "ready">; title: string; hint: string }[] = [
+  { key: "texting", title: "Texting right now", hint: "Messaged in the last couple of hours — the AI is mid-conversation." },
+  { key: "recent", title: "Called in the last 24 hours", hint: "Give them a day before trying again." },
+  { key: "tried", title: `Tried ${MAX_NO_ANSWERS}+ times, never answered`, hint: "Probably not worth more calls right now." },
+  { key: "talked", title: "Already talked", hint: "They picked up before. Only call again if you mean to." },
+];
+
+const blurb = (lead: Lead | undefined) => [lead && vehicleOf(lead), lead?.lead_special].filter(Boolean).join(" · ");
+
 /** Power dialer: ring your cell once, then it dials leads one at a time and connects you when a person answers. */
 export function Dialer() {
-  const { shop, leads, messagesByLead, openCallMode } = useDashboard();
+  const { shop, leads, messagesByLead, callLogs, status, openCallMode } = useDashboard();
   const toast = useToast();
   const [session, setSession] = useState<DialerSession | null>(null);
   const [checking, setChecking] = useState(true);
   const [busy, setBusy] = useState(false);
   const [picked, setPicked] = useState<Set<number> | null>(null);
 
-  // Leads that can be called, newest first
-  const callable = useMemo(
-    () =>
-      leads
-        .filter((l) => normPhone(l.lead_phone ?? "") && !NOT_CALLABLE.includes(l.call_status ?? "pending"))
-        .sort((a, b) => b.id - a.id),
-    [leads],
-  );
-  // By default: everyone who hasn't texted back yet
-  const selected = useMemo(
-    () => picked ?? new Set(callable.filter((l) => !(messagesByLead.get(l.id) ?? []).some((m) => m.direction === "inbound")).map((l) => l.id)),
-    [picked, callable, messagesByLead],
-  );
+  const groups = useMemo(() => buildQueue(leads, messagesByLead, callLogs), [leads, messagesByLead, callLogs]);
+  // By default: everyone who's ready, ripest first. The held-back groups start unchecked.
+  const selected = useMemo(() => picked ?? new Set(groups.ready.map((c) => c.lead.id)), [picked, groups.ready]);
+  const ordered = useMemo(() => [groups.ready, groups.texting, groups.recent, groups.tried, groups.talked].flat(), [groups]);
 
   // Pick up a session that's already running (page reload, second device)
   useEffect(() => {
@@ -73,7 +87,10 @@ export function Dialer() {
   const start = async () => {
     setBusy(true);
     try {
-      setSession(await startDialer(shop.adminSecret, shop.id, callable.filter((l) => selected.has(l.id)).map((l) => l.id)));
+      const ids = ordered.filter((c) => selected.has(c.lead.id)).map((c) => c.lead.id);
+      const result = await startDialer(shop.adminSecret, shop.id, ids);
+      setSession(result.session);
+      if (result.skipped) toast(`Left out ${result.skipped} ${result.skipped === 1 ? "lead" : "leads"} called within the last 2 hours`);
     } catch (e) {
       toast(e instanceof ApiError ? e.message : "Couldn’t start the dialer", "error");
     } finally {
@@ -93,7 +110,7 @@ export function Dialer() {
     [session, shop.adminSecret, toast],
   );
 
-  if (checking) return <Spinner label="Checking for a running session…" />;
+  if (checking || (status === "loading" && !session)) return <Spinner label="Loading your leads…" />;
 
   if (session && session.state !== "finished") return <Live session={session} act={act} onOpen={hasFeature(shop, "callMode") ? openCallMode : undefined} />;
 
@@ -103,7 +120,8 @@ export function Dialer() {
     else next.add(id);
     setPicked(next);
   };
-  const count = callable.filter((l) => selected.has(l.id)).length;
+  const count = ordered.filter((c) => selected.has(c.lead.id)).length;
+  const ripe = groups.ready.filter((c) => c.ripe).length;
 
   return (
     <>
@@ -112,14 +130,13 @@ export function Dialer() {
         We&rsquo;ll ring your cell first. Pick up, and the dialer calls each lead in turn, skips answering machines, and connects you as soon as a
         person says hello. Calls run 8 AM–8 PM {shop.timezone.split("/")[1]?.replace("_", " ")} time and aren&rsquo;t recorded.
       </div>
+
       <div className="mb-3 flex flex-wrap items-center justify-between gap-3">
         <div className="text-sm text-muted">
-          {count} of {callable.length} leads selected
+          <span className="font-semibold text-text">{groups.ready.length} ready</span>
+          {ripe > 0 && <> · {ripe} are callbacks, missed calls or replied-then-quiet (listed first)</>}
         </div>
         <div className="flex gap-2">
-          <Button size="sm" onClick={() => setPicked(new Set(callable.map((l) => l.id)))}>
-            Select all
-          </Button>
           <Button size="sm" onClick={() => setPicked(new Set())}>
             Clear
           </Button>
@@ -128,35 +145,107 @@ export function Dialer() {
           </Button>
         </div>
       </div>
+
       <div className="overflow-hidden rounded-xl border border-line bg-surface">
-        {callable.length === 0 && <div className="px-5 py-10 text-center text-sm text-muted">No leads with a callable number.</div>}
-        {callable.map((lead) => (
-          <label
-            key={lead.id}
-            className="flex cursor-pointer items-center gap-3 border-b border-line px-4 py-3 text-sm last:border-b-0 hover:bg-text/[0.025] md:px-5"
-          >
-            <input type="checkbox" className="size-4 accent-[var(--accent)]" checked={selected.has(lead.id)} onChange={() => toggle(lead.id)} />
-            <div className="min-w-0 flex-1">
-              <div className="font-semibold [overflow-wrap:anywhere]">{lead.lead_name || "—"}</div>
-              <div className="text-xs text-muted [overflow-wrap:anywhere]">{[vehicleOf(lead), lead.lead_special].filter(Boolean).join(" · ") || "—"}</div>
-            </div>
-            <div className="text-xs text-muted">{fmtPhone(lead.lead_phone)}</div>
-          </label>
+        {groups.ready.length === 0 && <div className="px-5 py-10 text-center text-sm text-muted">Nobody is ready to call right now.</div>}
+        {groups.ready.map((c) => (
+          <Row key={c.lead.id} c={c} checked={selected.has(c.lead.id)} onToggle={() => toggle(c.lead.id)} />
         ))}
       </div>
+
+      {HELD_BACK.map(({ key, title, hint }) =>
+        groups[key].length === 0 ? null : (
+          <details key={key} className="mt-4 overflow-hidden rounded-xl border border-line bg-surface">
+            <summary className="flex cursor-pointer items-center justify-between gap-3 px-4 py-3 text-sm md:px-5">
+              <span className="font-semibold">
+                {title} <span className="font-normal text-muted">({groups[key].length})</span>
+              </span>
+              <span className="hidden text-xs text-muted sm:inline">{hint}</span>
+            </summary>
+            <div className="border-t border-line">
+              {groups[key].map((c) => (
+                <Row key={c.lead.id} c={c} checked={selected.has(c.lead.id)} onToggle={() => toggle(c.lead.id)} />
+              ))}
+            </div>
+          </details>
+        ),
+      )}
     </>
   );
 }
 
+function Row({ c, checked, onToggle }: { c: Candidate; checked: boolean; onToggle: () => void }) {
+  const { lead } = c;
+  return (
+    <label className="flex cursor-pointer items-center gap-3 border-b border-line px-4 py-3 text-sm last:border-b-0 hover:bg-text/[0.025] md:px-5">
+      <input type="checkbox" className="size-4 accent-[var(--accent)]" checked={checked} onChange={onToggle} />
+      <div className="min-w-0 flex-1">
+        <div className="font-semibold [overflow-wrap:anywhere]">{lead.lead_name || "—"}</div>
+        <div className="text-xs text-muted [overflow-wrap:anywhere]">{blurb(lead) || "—"}</div>
+      </div>
+      <div className="text-right">
+        <div className={cn("text-xs", c.ripe ? "font-semibold text-accent" : "text-muted")}>{c.reason}</div>
+        <div className="text-xs text-muted">{fmtPhone(lead.lead_phone)}</div>
+      </div>
+    </label>
+  );
+}
+
 function Live({ session, act, onOpen }: { session: DialerSession; act: (a: DialerAction) => Promise<void>; onOpen?: (leadId: number) => void }) {
+  const { shop, leads, patchLead, refresh } = useDashboard();
+  const toast = useToast();
   const [pending, setPending] = useState(false);
+  const [sending, setSending] = useState<string | null>(null);
+  const [killed, setKilled] = useState<Set<number>>(new Set());
+
   const run = async (a: DialerAction) => {
     setPending(true);
     await act(a);
     setPending(false);
   };
+
   const s = session.state;
   const waiting = s === "wrapup" || s === "paused" || s === "between";
+  const lead = leads.find((l) => l.id === session.current?.lead_id);
+  const onCall = s === "connected" || s === "wrapup";
+  const quickTexts = onCall && lead ? (shop.callMode?.quickTexts(lead) ?? []) : [];
+  const isKilled = !!lead && (killed.has(lead.id) || ["dead", "opted_out"].includes(lead.call_status ?? ""));
+
+  const sendQuick = async (q: QuickText) => {
+    if (!lead) return;
+    setSending(q.id);
+    try {
+      if (q.attachmentUrl) await sendMessageWithLink(shop.adminSecret, lead.id, q.text, q.attachmentUrl);
+      else await sendMessage(shop.adminSecret, lead.id, q.text);
+      void refresh();
+      toast(`Sent to ${firstName(lead.lead_name)} ✓`);
+    } catch (e) {
+      toast(e instanceof ApiError ? e.message : "Couldn’t send that", "error");
+    } finally {
+      setSending(null);
+    }
+  };
+
+  // They said they're not interested: kill the lead and log it, without hanging up on them
+  const notInterested = async () => {
+    if (!lead) return;
+    try {
+      await updateLeadStatus(shop.adminSecret, lead.id, "dead");
+      await logCall(shop.adminSecret, {
+        lead_id: lead.id,
+        shop_id: shop.id,
+        lead_name: lead.lead_name,
+        lead_phone: lead.lead_phone,
+        outcome: "not_interested",
+        notes: "Power dialer · said not interested",
+      });
+      patchLead(lead.id, { call_status: "dead" });
+      setKilled((prev) => new Set(prev).add(lead.id));
+      toast(`${firstName(lead.lead_name)} marked dead — follow-ups cancelled`);
+    } catch (e) {
+      toast(e instanceof ApiError ? e.message : "Couldn’t update the lead", "error");
+    }
+  };
 
   return (
     <div className="rounded-xl border border-accent/25 bg-surface p-5">
@@ -167,10 +256,11 @@ function Live({ session, act, onOpen }: { session: DialerSession; act: (a: Diale
         </span>
       </div>
       <div className="mt-4 flex items-center gap-3">
-        <span className={cn("size-2.5 rounded-full", s === "connected" ? "bg-ok" : s === "dialing" ? "animate-pulse-dot bg-accent" : "bg-muted")} />
+        <span className={cn("size-2.5 shrink-0 rounded-full", s === "connected" ? "bg-ok" : s === "dialing" ? "animate-pulse-dot bg-accent" : "bg-muted")} />
         <div className="min-w-0">
           <div className="font-display text-2xl [overflow-wrap:anywhere]">{session.current?.name ?? "Getting ready…"}</div>
           <div className="text-sm text-muted">{session.current ? fmtPhone(session.current.phone) : " "}</div>
+          {blurb(lead) && <div className="mt-0.5 text-sm text-text/80 [overflow-wrap:anywhere]">{blurb(lead)}</div>}
         </div>
       </div>
       <p className="mt-3 text-sm" role="status">
@@ -210,6 +300,37 @@ function Live({ session, act, onOpen }: { session: DialerSession; act: (a: Diale
           <CircleStop className="size-4" /> Stop
         </Button>
       </div>
+
+      {onCall && lead && (
+        <div className="mt-5 border-t border-line pt-4">
+          {quickTexts.length > 0 && (
+            <>
+              <div className="mb-2 text-[11px] font-semibold tracking-[0.1em] text-muted uppercase">Text {firstName(lead.lead_name)}</div>
+              <div className="grid grid-cols-2 gap-2 sm:grid-cols-4">
+                {quickTexts.map((q) => {
+                  const Icon = QUICK_ICONS[q.icon];
+                  return (
+                    <button
+                      key={q.id}
+                      type="button"
+                      disabled={sending !== null}
+                      onClick={() => void sendQuick(q)}
+                      className="flex items-center justify-center gap-2 rounded-xl border border-line bg-surface2 px-3 py-3 text-[13px] transition hover:border-line2 disabled:opacity-50"
+                    >
+                      <Icon className="size-4 shrink-0 text-accent" /> {sending === q.id ? "Sending…" : q.label}
+                    </button>
+                  );
+                })}
+              </div>
+            </>
+          )}
+          <div className="mt-3">
+            <Button variant="danger" size="sm" disabled={isKilled} onClick={() => void notInterested()}>
+              <ThumbsDown className="size-3.5" /> {isKilled ? "Marked dead" : "Not interested — kill lead"}
+            </Button>
+          </div>
+        </div>
+      )}
 
       {session.results.length > 0 && (
         <ul className="mt-6 divide-y divide-line border-t border-line text-sm">

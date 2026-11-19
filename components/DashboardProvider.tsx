@@ -59,7 +59,7 @@ export function useDashboard(): DashboardContextValue {
 export function DashboardProvider({ shop, children }: { shop: Shop; children: ReactNode }) {
   const router = useRouter();
   const base = `/${shop.id}`;
-  const wantsCallLogs = hasFeature(shop, "callHistory");
+  const wantsCallLogs = hasFeature(shop, "callHistory") || hasFeature(shop, "dialer");
 
   const [leads, setLeads] = useState<Lead[]>([]);
   const [messages, setMessages] = useState<Message[]>([]);
