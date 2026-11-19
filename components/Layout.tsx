@@ -3,7 +3,7 @@
 import type { ReactNode } from "react";
 import Link from "next/link";
 import { usePathname, useRouter } from "next/navigation";
-import { CalendarDays, MessageSquare, Phone, Users, type LucideIcon } from "lucide-react";
+import { CalendarDays, MessageSquare, Phone, PhoneCall, Users, type LucideIcon } from "lucide-react";
 import { useDashboard } from "@/components/DashboardProvider";
 import { hasFeature } from "@/config/shops";
 import type { Feature } from "@/config/types";
@@ -42,6 +42,7 @@ export function Layout({ children }: { children: ReactNode }) {
     [
       { href: base, label: "Conversations", short: "Chats", icon: MessageSquare, feature: "conversations" },
       { href: `${base}/calls`, label: "Call History", short: "Calls", icon: Phone, feature: "callHistory" },
+      { href: `${base}/dialer`, label: "Power Dialer", short: "Dialer", icon: PhoneCall, feature: "dialer" },
       { href: `${base}/schedule`, label: "Schedule", short: "Schedule", icon: CalendarDays, feature: "schedule" },
       { href: `${base}/leads`, label: "Leads", short: "Leads", icon: Users, feature: "leads" },
     ] satisfies NavItem[]

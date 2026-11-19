@@ -1,4 +1,4 @@
-import type { CalendarEvent, CallLog, Lead, LeadNote, Message } from "@/lib/types";
+import type { CalendarEvent, CallLog, DialerSession, Lead, LeadNote, Message } from "@/lib/types";
 
 /**
  * Backend base URL. Override with NEXT_PUBLIC_API_URL (build-time) to point a local
@@ -179,6 +179,37 @@ export async function bookAppointment(data: BookAppointmentInput): Promise<void>
 
 export async function sendDeposit(name: string, phone: string): Promise<void> {
   assertSuccess(await post<{ success?: boolean; response?: string }>("/tools/send-deposit", { lead_name: name, lead_phone: phone }));
+}
+
+// ── Voice ─────────────────────────────────────────────────────────────────────
+
+/** Rings the shop owner's cell, then dials the lead and connects the two. */
+export function startCall(secret: string, leadId: number): Promise<void> {
+  return post<{ success: boolean }>("/admin/voice/call", { secret, lead_id: leadId }).then(() => undefined);
+}
+
+export function startDialer(secret: string, shopId: string, leadIds: number[]): Promise<DialerSession> {
+  return post<{ session: DialerSession }>("/admin/voice/dialer/start", { secret, shop_id: shopId, lead_ids: leadIds }).then((r) => r.session);
+}
+
+/** The shop's running dialer session, if any (so a page reload picks it back up). */
+export function getActiveDialer(secret: string, shopId: string): Promise<DialerSession | null> {
+  return request<{ session: DialerSession | null }>(`/admin/voice/dialer/active?secret=${q(secret)}&shop_id=${q(shopId)}`).then((r) => r.session);
+}
+
+export function getDialer(secret: string, id: string): Promise<DialerSession> {
+  return request<{ session: DialerSession }>(`/admin/voice/dialer/${q(id)}?secret=${q(secret)}`).then((r) => r.session);
+}
+
+export type DialerAction = "next" | "pause" | "resume" | "skip" | "stop";
+
+export function dialerAction(secret: string, id: string, action: DialerAction): Promise<DialerSession> {
+  return post<{ session: DialerSession }>(`/admin/voice/dialer/${q(id)}/action`, { secret, action }).then((r) => r.session);
+}
+
+/** URL of a voicemail's audio (the backend fetches it from Twilio with its own credentials). */
+export function voicemailUrl(secret: string, id: number | string): string {
+  return `${API}/admin/voice/recording/${q(String(id))}?secret=${q(secret)}`;
 }
 
 // ── Demo trigger ──────────────────────────────────────────────────────────────

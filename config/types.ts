@@ -11,7 +11,9 @@ export type Feature =
   | "reviveMode"
   | "calendarManagement"
   | "notes"
-  | "demoTrigger";
+  | "demoTrigger"
+  | "voice"
+  | "dialer";
 
 /** Fonts the app knows how to load (see lib/fonts.ts). A typo here is a compile error. */
 export type FontName =

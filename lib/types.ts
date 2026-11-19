@@ -40,6 +40,19 @@ export interface CallLog {
   created_at: string;
 }
 
+/** Live state of a power-dialer session, as the backend reports it. */
+export interface DialerSession {
+  id: string;
+  shop_id: string;
+  state: "starting" | "dialing" | "connected" | "between" | "wrapup" | "paused" | "finished";
+  paused: boolean;
+  message: string;
+  index: number;
+  total: number;
+  current: { lead_id: number; name: string; phone: string } | null;
+  results: { lead_id: number; name: string; phone: string; outcome: string; seconds?: number }[];
+}
+
 export interface CalendarEvent {
   id: string;
   summary: string;

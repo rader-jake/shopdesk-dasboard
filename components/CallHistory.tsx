@@ -8,6 +8,7 @@ import { StatCard } from "@/components/StatsRow";
 import { EmptyState, Notice, Spinner } from "@/components/ui/states";
 import { hasFeature } from "@/config/shops";
 import { cn } from "@/lib/cn";
+import { voicemailUrl } from "@/lib/api";
 import { fmtDate, fmtPhone, parseTs, todayIn } from "@/lib/format";
 
 const OUTCOMES: Record<string, { label: string; style: string }> = {
@@ -15,7 +16,13 @@ const OUTCOMES: Record<string, { label: string; style: string }> = {
   callback: { label: "Call back", style: "border-line bg-text/5 text-muted" },
   no_answer: { label: "No answer", style: "border-warn/30 bg-warn/10 text-warn" },
   not_interested: { label: "Not interested", style: "border-line2 bg-text/5 text-muted" },
+  connected: { label: "Connected", style: "border-ok/30 bg-ok/10 text-ok" },
+  missed_call: { label: "Missed call", style: "border-danger/30 bg-danger/10 text-danger" },
+  voicemail: { label: "Voicemail", style: "border-manual/30 bg-manual/10 text-manual" },
 };
+
+/** The backend tags a voicemail's notes with [VOICEMAIL: id] so the page can play it. */
+const VOICEMAIL_TAG = /\s*\[VOICEMAIL: (\d+)\]/;
 
 export function CallHistory() {
   const { shop, callLogs, leads, status, openCallMode } = useDashboard();
@@ -69,7 +76,10 @@ export function CallHistory() {
           </div>
           {callLogs.map((log) => {
             const outcome = OUTCOMES[log.outcome] ?? { label: log.outcome, style: "border-line bg-text/5 text-muted" };
-            const clickable = canOpen && log.lead_id !== null && leadIds.has(log.lead_id);
+            const voicemailId = log.notes?.match(VOICEMAIL_TAG)?.[1];
+            const notes = log.notes?.replace(VOICEMAIL_TAG, "") ?? "";
+            // An audio player can't sit inside a button, so voicemail rows aren't tap-to-open
+            const clickable = canOpen && log.lead_id !== null && leadIds.has(log.lead_id) && !voicemailId;
             const Row = clickable ? "button" : "div";
             return (
               <Row
@@ -89,7 +99,12 @@ export function CallHistory() {
                     {outcome.label}
                   </span>
                 </div>
-                <div className="col-span-2 min-w-0 text-[13px] text-muted [overflow-wrap:anywhere] md:col-span-1 md:truncate">{log.notes || "—"}</div>
+                <div className="col-span-2 min-w-0 text-[13px] text-muted [overflow-wrap:anywhere] md:col-span-1 md:truncate">
+                  {notes || "—"}
+                  {voicemailId && (
+                    <audio controls preload="none" src={voicemailUrl(shop.adminSecret, voicemailId)} className="mt-1.5 h-9 w-full max-w-xs" />
+                  )}
+                </div>
                 <div className="col-span-2 text-xs text-muted md:col-span-1">{fmtDate(log.created_at, tz)}</div>
               </Row>
             );

@@ -43,6 +43,9 @@ export const SHOPS: Record<string, Shop> = defineShops({
       "calendarManagement",
       // The backend's /admin/notes routes are scoped to Pure Vision Tints for now.
       "notes",
+      // Click-to-call and the power dialer ring Jordy's cell (JORDY_PHONE on the backend).
+      "voice",
+      "dialer",
     ],
     calendarId: "primary",
     phone: "(832) 741-1485",
@@ -210,7 +213,7 @@ export const SHOPS: Record<string, Shop> = defineShops({
       displayFont: "DM Serif Display",
       bodyFont: "DM Sans",
     },
-    features: ["conversations", "leads", "demoTrigger"],
+    features: ["conversations", "callHistory", "leads", "demoTrigger", "voice", "dialer"],
     owner: "Jake",
     demoTrigger: {
       vehicleField: "business_name",

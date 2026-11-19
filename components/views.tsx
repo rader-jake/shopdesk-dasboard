@@ -3,6 +3,7 @@
 import { CalendarGrid } from "@/components/CalendarGrid";
 import { CallHistory } from "@/components/CallHistory";
 import { ConversationList } from "@/components/ConversationList";
+import { Dialer } from "@/components/Dialer";
 import { useDashboard } from "@/components/DashboardProvider";
 import { DemoTrigger } from "@/components/DemoTrigger";
 import { LeadsTable } from "@/components/LeadsTable";
@@ -29,6 +30,15 @@ export function ConversationsView() {
 
 export function CallsView() {
   return <CallHistory />;
+}
+
+export function DialerView() {
+  return (
+    <>
+      <PageHeader title="Power Dialer" subtitle="Dial your leads back to back · you only talk to people who answer" />
+      <Dialer />
+    </>
+  );
 }
 
 export function ScheduleView() {

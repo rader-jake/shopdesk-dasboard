@@ -1,7 +1,7 @@
 "use client";
 
 import { useEffect, useMemo, useRef, useState } from "react";
-import { Flame, ImagePlus, MessageSquare, Phone, Send, X } from "lucide-react";
+import { Flame, ImagePlus, MessageSquare, Phone, PhoneCall, Send, X } from "lucide-react";
 import { useDashboard } from "@/components/DashboardProvider";
 import { MessageBubble } from "@/components/MessageBubble";
 import { Button } from "@/components/ui/button";
@@ -10,7 +10,7 @@ import { ConfirmDialog } from "@/components/ui/confirm";
 import { EmptyState, Notice, Spinner } from "@/components/ui/states";
 import { useToast } from "@/components/ui/toast";
 import { hasFeature } from "@/config/shops";
-import { ApiError, sendMessage, sendPhoto, toggleManualMode, updateLeadStatus } from "@/lib/api";
+import { ApiError, sendMessage, sendPhoto, startCall, toggleManualMode, updateLeadStatus } from "@/lib/api";
 import { cn } from "@/lib/cn";
 import {
   BOOKED_STATUSES,
@@ -18,6 +18,7 @@ import {
   fmtDate,
   fmtPhone,
   initials,
+  normPhone,
   parseTs,
   previewText,
   vehicleOf,
@@ -247,6 +248,7 @@ function Thread({ lead, msgs }: { lead: Lead; msgs: Message[] }) {
 
   const [draft, setDraft] = useState("");
   const [sending, setSending] = useState(false);
+  const [calling, setCalling] = useState(false);
   const [photo, setPhoto] = useState<{ file: File; previewUrl: string } | null>(null);
   const photoInputRef = useRef<HTMLInputElement>(null);
   const [confirmKill, setConfirmKill] = useState(false);
@@ -308,6 +310,18 @@ function Thread({ lead, msgs }: { lead: Lead; msgs: Message[] }) {
     }
   };
 
+  const call = async () => {
+    setCalling(true);
+    try {
+      await startCall(shop.adminSecret, lead.id);
+      toast(`Calling your cell — pick up and we'll dial ${lead.lead_name ?? "the lead"}`);
+    } catch (e) {
+      toast(e instanceof ApiError ? e.message : "Couldn’t place the call", "error");
+    } finally {
+      setCalling(false);
+    }
+  };
+
   const kill = async () => {
     setKilling(true);
     try {
@@ -345,6 +359,17 @@ function Thread({ lead, msgs }: { lead: Lead; msgs: Message[] }) {
             <span className={cn("size-1.5 rounded-full", manual ? "bg-manual" : "bg-accent")} />
             {manual ? "Manual mode" : "AI active"}
           </button>
+          {hasFeature(shop, "voice") && (
+            <Button
+              variant="accent-soft"
+              size="sm"
+              disabled={calling || !normPhone(lead.lead_phone ?? "")}
+              title={normPhone(lead.lead_phone ?? "") ? undefined : "This lead has no valid phone number"}
+              onClick={() => void call()}
+            >
+              <PhoneCall className="size-3.5" /> Call
+            </Button>
+          )}
           {hasFeature(shop, "callMode") && (
             <Button variant="accent-soft" size="sm" onClick={() => openCallMode(lead.id)}>
               <Phone className="size-3.5" /> Call mode
